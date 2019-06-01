@@ -1,0 +1,160 @@
+---
+title: "Happy Planet Index clustering script"
+subtitle: "HarvardX Data Science Capstone Own Project"
+author: "Codrin Kruijne"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_notebook: default
+urlcolor: blue
+---
+
+```{r setup, message = FALSE, warning = FALSE}
+# PLEASE NOTE
+# THIS SCRIPT HAS ONLY BEEN TESTED ON A 6-CORE (12-THREAD), 64GB MEMORY MACHINE
+# AND WILL PROBABLY NOT RUN WITH LOWER COMPUTER SPECIFICATIONS.
+parallel::detectCores()
+memory.limit()
+
+# Script settings
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	tidy.opts = list(width.cutoff = 100),
+	tidy = TRUE
+)
+script_start <- Sys.time()
+
+# Load required packages
+library(tidyverse)
+library(readxl)
+```
+
+# Loading data
+
+```{r Loading Data}
+# HPI data from http://happyplanetindex.org/s/hpi-data-2016.xlsx retrieved on 2019-06-01
+
+HPI <- read_excel("Data/hpi-data-2016.xlsx",
+                  sheet = "Complete HPI data",
+                  range = "B6:O146",
+                  trim_ws = TRUE)
+HPI[2:3] <- lapply(HPI[2:3], as.factor)
+
+# We scale features to be used as distance features
+hpi <- HPI %>% mutate(life_exp_scaled = scale(`Average Life \r\nExpectancy`),
+                      well_being_scaled = scale(`Average Wellbeing\r\n(0-10)`),
+                      ineq_outcomes_scaled = scale(`Inequality of Outcomes`),
+                      footprint_scaled = scale(`Footprint\r\n(gha/capita)`),
+                      hpi_scaled = scale(`Happy Planet Index`),
+                      # rename columns for ease of coding
+                      happy_life_years = `Happy Life Years`,
+                      footprint = `Footprint\r\n(gha/capita)`,
+                      happy_planet_index = `Happy Planet Index`)
+```
+
+
+```{r Data Exploration}
+
+# Let's have a quick look at the HPI data
+hist(hpi$happy_planet_index, breaks = 30)
+
+ggplot(hpi, aes(x = happy_life_years, y = footprint, size = happy_planet_index)) + geom_point()
+```
+
+# Clustering data
+
+```{r}
+data_clusters <- kmeans(hpi[, 15:19], 4, nstart = 20)
+
+data_clustered <- mutate(hpi, cluster = data_clusters$cluster)
+
+ggplot(data_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = cluster)) + geom_point()
+```
+
+# Finding optimal amount of clusters
+```{r}
+
+# Using the elbow method
+library(purrr)
+
+tot_withinss <- map_dbl(1:10,  function(k){
+  model <- kmeans(x = hpi[, 15:19], centers = k)
+  model$tot.withinss
+})
+
+elbow_df <- data.frame(
+  k = 1:10,
+  tot_withinss = tot_withinss
+)
+
+print(elbow_df)
+
+ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
+  geom_line() +
+  scale_x_continuous(breaks = 1:10)
+
+```
+
+```{r}
+# It seems 2 or 3 clusters is optimal, let's have a look
+
+hpi_bi_clusters <- kmeans(hpi[, 15:19], centers = 2, nstart = 20)
+hpi_tri_clusters <- kmeans(hpi[, 15:19], centers = 3, nstart = 20)
+
+hpi_clustered <- hpi %>% mutate(bi_cluster = hpi_bi_clusters$cluster,
+                                tri_cluster = hpi_tri_clusters$cluster)
+
+ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
+ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = tri_cluster)) + geom_point()
+```
+
+```{r}
+# How about analysis with silhoutte plot? https://campus.datacamp.com/courses/cluster-analysis-in-r/k-means-clustering?ex=8
+
+library(cluster)
+pam_k3 <- pam(hpi[, 15:19], k = 3)
+
+#pam_k3$silinfo$widths
+
+sil_plot <- silhouette(pam_k3)
+
+plot(sil_plot)
+```
+```{r}
+sil_width <- map_dbl(2:10,  function(k){
+  model <- pam(x = hpi[, 15:19], k = k)
+  model$silinfo$avg.width
+})
+
+sil_df <- data.frame(
+  k = 2:10,
+  sil_width = sil_width
+)
+
+print(sil_df)
+
+ggplot(sil_df, aes(x = k, y = sil_width)) +
+  geom_line() +
+  scale_x_continuous(breaks = 2:10)
+```
+```{r}
+# Clearly division in two cluster results in best fit
+ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
+
+```
+
+```{r}
+# Let's add some more data
+# SPI data
+spi <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
+                 sheet = "2016",
+                 range = "A1:BQ237",
+                 trim_ws = TRUE)
+spi[3:76] <- lapply(spi[3:69], as.numeric)
+spi[1:2] <- lapply(spi[1:2], as.factor)
+
+data <- hpi %>% inner_join(spi, by = "Country", suffix = c("hpi", "spi"))
+```
+

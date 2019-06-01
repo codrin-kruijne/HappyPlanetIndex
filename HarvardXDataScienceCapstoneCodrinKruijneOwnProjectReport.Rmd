@@ -1,0 +1,60 @@
+---
+title: "Happy Planet Index clustering script"
+subtitle: "HarvardX Data Science Capstone Own Project"
+author: "Codrin Kruijne"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+require(dplyr)
+```
+
+This report has been prepared for the [HarvardX Data Science program](https://www.edx.org/professional-certificate/harvardx-data-science) Capstone course final project submission and consists of three files of original work that can be found [on GitHub](https://github.com/codrin-kruijne/HappyPlanetIndex) (with all commits): this [report in PDF](), this [report in R markdown]() and an [R markdown script file]() with all the code (also [knitted to PDF with results]() for convenience). Results are read in from data objects stored locally (also saved in the GitHub repository), that were the output of the script file.
+
+
+# Introduction
+
+- HPI
+- Datasets
+- Clustering
+- Results
+
+# Analysis
+
+## Raw data
+
+
+## Data preparation
+
+
+## Data exploration
+```{r}
+
+```
+
+## Modeling
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+```{r}
+
+```
+
+# Conclusion
+
+
+# References
+1. [How is the Happy Planet Index calculated?](http://happyplanetindex.org/about#how)
+2. [Social Progress Imperative](https://www.socialprogress.org/index/global)
