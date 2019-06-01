@@ -43,14 +43,15 @@ HPI <- read_excel("Data/hpi-data-2016.xlsx",
 HPI[2:3] <- lapply(HPI[2:3], as.factor)
 
 # We scale features to be used as distance features
-hpi <- HPI %>% mutate(life_exp_scaled = scale(`Average Life \r\nExpectancy`),
+hpi <- HPI %>% mutate(footprint = 1.73 - `Footprint\r\n(gha/capita)`, # Footprint above global biocapacity of 1.73 gha
+                      life_exp_scaled = scale(`Average Life \r\nExpectancy`),
                       well_being_scaled = scale(`Average Wellbeing\r\n(0-10)`),
                       ineq_outcomes_scaled = scale(`Inequality of Outcomes`),
                       footprint_scaled = scale(`Footprint\r\n(gha/capita)`),
+                      happy_life_years_scaled = scale(`Happy Life Years`),
                       hpi_scaled = scale(`Happy Planet Index`),
                       # rename columns for ease of coding
                       happy_life_years = `Happy Life Years`,
-                      footprint = `Footprint\r\n(gha/capita)`,
                       happy_planet_index = `Happy Planet Index`)
 ```
 
@@ -68,7 +69,7 @@ ggplot(hpi, aes(x = happy_life_years, y = footprint, size = happy_planet_index))
 ```{r}
 data_clusters <- kmeans(hpi[, 15:19], 4, nstart = 20)
 
-data_clustered <- mutate(hpi, cluster = data_clusters$cluster)
+data_clustered <- mutate(hpi, cluster = as.factor(data_clusters$cluster))
 
 ggplot(data_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = cluster)) + geom_point()
 ```
@@ -103,8 +104,8 @@ ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
 hpi_bi_clusters <- kmeans(hpi[, 15:19], centers = 2, nstart = 20)
 hpi_tri_clusters <- kmeans(hpi[, 15:19], centers = 3, nstart = 20)
 
-hpi_clustered <- hpi %>% mutate(bi_cluster = hpi_bi_clusters$cluster,
-                                tri_cluster = hpi_tri_clusters$cluster)
+hpi_clustered <- hpi %>% mutate(bi_cluster = as.factor(hpi_bi_clusters$cluster),
+                                tri_cluster = as.factor(hpi_tri_clusters$cluster))
 
 ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
 ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = tri_cluster)) + geom_point()
@@ -155,6 +156,86 @@ spi <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
 spi[3:76] <- lapply(spi[3:69], as.numeric)
 spi[1:2] <- lapply(spi[1:2], as.factor)
 
-data <- hpi %>% inner_join(spi, by = "Country", suffix = c("hpi", "spi"))
+# scale
+spi[3:76] <- scale(spi[3:76])
+
+# merge scaled data
+data <- hpi[, c(2, 15:23)] %>% inner_join(spi, by = "Country")
+complete_data <- data[complete.cases(data),]
+
+```
+
+```{r}
+
+# How many clusters is optimal?
+
+# Elbow avoid unscaled c("Country", "happy_life_years", "footprint", "Code")
+tot_withinss <- map_dbl(1:10,  function(k){
+  model <- kmeans(x = complete_data[, -c(1, 8:11)], centers = k)
+  model$tot.withinss
+})
+
+elbow_df <- data.frame(
+  k = 1:10,
+  tot_withinss = tot_withinss
+)
+
+print(elbow_df)
+
+ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
+  geom_line() +
+  scale_x_continuous(breaks = 1:10)
+
+# Silhouette width
+sil_width <- map_dbl(2:10,  function(k){
+  model <- pam(x = complete_data[, -c(1, 8:11)], k = k)
+  model$silinfo$avg.width
+})
+
+sil_df <- data.frame(
+  k = 2:10,
+  sil_width = sil_width
+)
+
+print(sil_df)
+
+ggplot(sil_df, aes(x = k, y = sil_width)) +
+  geom_line() +
+  scale_x_continuous(breaks = 2:10)
+
+# Two clusters seems best again
+combi_clusters <- kmeans(complete_data[, -c(1, 8:11)], centers = 2, nstart = 20)
+
+combi_clustered <- complete_data %>% mutate(bi_cluster = as.factor(combi_clusters$cluster))
+
+ggplot(combi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
+```
+
+# What characterises those two clusters?
+
+```{r}
+# Statistics per cluster to compare
+
+cluster_averages <- combi_clustered %>% select(happy_life_years_scaled,
+                                               footprint_scaled,
+                                               hpi_scaled,
+                                               `Social Progress Index`,
+                                               `Basic Human Needs`,
+                                               `Foundations of Wellbeing`,
+                                               Opportunity,
+                                               bi_cluster) %>%
+                                        group_by(bi_cluster) %>%
+                                        summarise_all(mean) %>%
+                                        gather(-bi_cluster, key = "indicator", value = "score")
+
+# How to visualise this?
+ggplot(cluster_averages, aes(x= indicator, y = score, label = score)) + 
+  geom_bar(stat = "identity", aes(fill = bi_cluster), width = 0.5)  +
+  scale_fill_manual(name = "Cluster",
+                    labels = c("One cluster", "Other cluster"),
+                    values = c("1" = "#00ba38", "2" = "#f8766d")) +
+  labs(subtitle = "Subtitle will go here",
+       title = "This is the title") +
+  coord_flip()
 ```
 
