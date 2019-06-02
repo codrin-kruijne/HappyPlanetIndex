@@ -17,18 +17,15 @@ This report has been prepared for the [HarvardX Data Science program](https://ww
 
 # Introduction
 
-- HPI
-- Datasets
-- Clustering
-- Results
+Humankind uses diverse progress indicators, most currently Growth Domestic Product (GDP) to guage economic growth. It is becoming more apparant that this is a limited and myopic view and alternative measures have been emerging over te last years, like the United Nation's Human Development Index. I wanted to have a closer look at two concepts that follow; the Social Progress Index (SPI) and the Happy Planet index (HPI), which take into account the state of our ecosystems. This report describes merging the last avaialbele data for both from the year 2016, applying clustering to see how certain countries group, and have a look at their differences.
 
 # Analysis
 
 ## Raw data
-
+Data was downloaded from the official websites as Excel files and the last common year, 2016 was read in.
 
 ## Data preparation
-
+Data from HPI and SPI were joined by Country, scaled and missing values imputed by mean values.
 
 ## Data exploration
 ```{r}

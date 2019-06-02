@@ -28,60 +28,81 @@ script_start <- Sys.time()
 
 # Load required packages
 library(tidyverse)
+library(gridExtra)
 library(readxl)
+library(tidyimpute)
+library(cluster)
 ```
 
 # Loading data
 
-```{r Loading Data}
-# HPI data from http://happyplanetindex.org/s/hpi-data-2016.xlsx retrieved on 2019-06-01
+```{r Loading Raw Data}
+# Happy Planet Index data from http://happyplanetindex.org/s/hpi-data-2016.xlsx retrieved on 2019-06-01
 
 HPI <- read_excel("Data/hpi-data-2016.xlsx",
                   sheet = "Complete HPI data",
-                  range = "B6:O146",
+                  range = "C6:N146",
                   trim_ws = TRUE)
-HPI[2:3] <- lapply(HPI[2:3], as.factor)
+HPI[1:2] <- lapply(HPI[1:2], as.factor)
 
-# We scale features to be used as distance features
-hpi <- HPI %>% mutate(footprint = 1.73 - `Footprint\r\n(gha/capita)`, # Footprint above global biocapacity of 1.73 gha
-                      life_exp_scaled = scale(`Average Life \r\nExpectancy`),
-                      well_being_scaled = scale(`Average Wellbeing\r\n(0-10)`),
-                      ineq_outcomes_scaled = scale(`Inequality of Outcomes`),
-                      footprint_scaled = scale(`Footprint\r\n(gha/capita)`),
-                      happy_life_years_scaled = scale(`Happy Life Years`),
-                      hpi_scaled = scale(`Happy Planet Index`),
-                      # rename columns for ease of coding
-                      happy_life_years = `Happy Life Years`,
-                      happy_planet_index = `Happy Planet Index`)
+# Social Progress Initiative data from https://www.socialprogress.org/download retrieved in 2019-06-01
+SPI <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
+                  sheet = "2016",
+                  range = "A1:BQ147", # data for countries that are in the index
+                  trim_ws = TRUE)
+SPI[3:76] <- lapply(SPI[3:69], as.numeric)
+SPI[1:2] <- lapply(SPI[1:2], as.factor)
+SPI <- SPI %>% select(-Code)
+
+```
+
+
+```{r Data preparation}
+
+# Explore differing countries ### FIX DIFFERENT SPELLINGS
+diff_countries <- HPI %>% anti_join(SPI, by = "Country") %>% select(Country)
+
+# Join data
+raw <- HPI %>% inner_join(SPI, by = "Country") %>%
+                mutate(Country = as.factor(Country))
+
+# Impute scaled data
+imputed <- raw %>% impute_all(.na = mean, na.rm = TRUE)
+
+# Scale numeric data
+scaled <- imputed %>% mutate_if(is.numeric, scale) %>%
+                      rename_if(is.numeric, paste, "SCALED")
+
+
 ```
 
 
 ```{r Data Exploration}
 
 # Let's have a quick look at the HPI data
-hist(hpi$happy_planet_index, breaks = 30)
+hist(raw$`Happy Planet Index`, breaks = 30)
 
-ggplot(hpi, aes(x = happy_life_years, y = footprint, size = happy_planet_index)) + geom_point()
+ggplot(raw, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = `Region`)) + geom_point()
 ```
 
 # Clustering data
 
 ```{r}
-data_clusters <- kmeans(hpi[, 15:19], 4, nstart = 20)
+data_clusters <- kmeans(scaled[, -c(1, 2)], 6, nstart = 20)
 
-data_clustered <- mutate(hpi, cluster = as.factor(data_clusters$cluster))
+raw_clustered <- mutate(raw, cluster = as.factor(data_clusters$cluster))
+scaled_clustered <- mutate(scaled, cluster = as.factor(data_clusters$cluster))
 
-ggplot(data_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = cluster)) + geom_point()
+ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = cluster)) + geom_point()
 ```
 
 # Finding optimal amount of clusters
 ```{r}
 
 # Using the elbow method
-library(purrr)
 
 tot_withinss <- map_dbl(1:10,  function(k){
-  model <- kmeans(x = hpi[, 15:19], centers = k)
+  model <- kmeans(x = scaled[, -c(1, 2)], centers = k)
   model$tot.withinss
 })
 
@@ -92,144 +113,99 @@ elbow_df <- data.frame(
 
 print(elbow_df)
 
-ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
-  geom_line() +
-  scale_x_continuous(breaks = 1:10)
+elbow_plot <- ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
+                geom_line() +
+                scale_x_continuous(breaks = 1:10)
+
+# Silhouette method https://campus.datacamp.com/courses/cluster-analysis-in-r/k-means-clustering?ex=8
+pam_k2 <- pam(scaled[, -c(1, 2)], k = 2)
+pam_k3 <- pam(scaled[, -c(1, 2)], k = 3)
+
+#pam_k3$silinfo$widths
+
+library(gridGraphics)
+grab_grob <- function(){
+  grid.echo()
+  grid.grab()
+}
+plot(silhouette(pam_k2))
+pam_k2_plot <- grab_grob()
+plot(silhouette(pam_k3))
+pam_k3_plot <- grab_grob()
+
+# Silhouette width plot
+sil_width <- map_dbl(2:10,  function(k){
+  model <- pam(x = scaled[, -c(1, 2)], k = k)
+  model$silinfo$avg.width
+})
+
+sil_df <- data.frame(
+  k = 2:10,
+  sil_width = sil_width
+)
+
+print(sil_df)
+
+sil_width_plot <- ggplot(sil_df, aes(x = k, y = sil_width)) +
+                    geom_line() +
+                    scale_x_continuous(breaks = 2:10)
+
+
+# Arrange plots
+grid.arrange(elbow_plot, sil_width_plot, 
+             pam_k2_plot, pam_k3_plot,
+             ncol = 2, nrow = 2)
 
 ```
 
 ```{r}
 # It seems 2 or 3 clusters is optimal, let's have a look
 
-hpi_bi_clusters <- kmeans(hpi[, 15:19], centers = 2, nstart = 20)
-hpi_tri_clusters <- kmeans(hpi[, 15:19], centers = 3, nstart = 20)
+bi_clusters <- kmeans(scaled[, -c(1, 2)], centers = 2, nstart = 20)
+tri_clusters <- kmeans(scaled[, -c(1, 2)], centers = 3, nstart = 20)
+quad_clusters <- kmeans(scaled[, -c(1, 2)], centers = 4, nstart = 20)
 
-hpi_clustered <- hpi %>% mutate(bi_cluster = as.factor(hpi_bi_clusters$cluster),
-                                tri_cluster = as.factor(hpi_tri_clusters$cluster))
+raw_clustered <- raw_clustered %>% mutate(bi_cluster = as.factor(bi_clusters$cluster),
+                                          tri_cluster = as.factor(tri_clusters$cluster),
+                                          quad_cluster = as.factor(quad_clusters$cluster))
 
-ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
-ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = tri_cluster)) + geom_point()
+bi_plot <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = bi_cluster)) + geom_point()
+tri_plot <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = tri_cluster)) + geom_point()
+quad_plot <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = quad_cluster)) + geom_point()
+
+# Arrange plots
+grid.arrange(bi_plot, tri_plot, quad_plot,
+             ncol = 1, nrow = 3)
 ```
 
-```{r}
-# How about analysis with silhoutte plot? https://campus.datacamp.com/courses/cluster-analysis-in-r/k-means-clustering?ex=8
-
-library(cluster)
-pam_k3 <- pam(hpi[, 15:19], k = 3)
-
-#pam_k3$silinfo$widths
-
-sil_plot <- silhouette(pam_k3)
-
-plot(sil_plot)
-```
-```{r}
-sil_width <- map_dbl(2:10,  function(k){
-  model <- pam(x = hpi[, 15:19], k = k)
-  model$silinfo$avg.width
-})
-
-sil_df <- data.frame(
-  k = 2:10,
-  sil_width = sil_width
-)
-
-print(sil_df)
-
-ggplot(sil_df, aes(x = k, y = sil_width)) +
-  geom_line() +
-  scale_x_continuous(breaks = 2:10)
-```
-```{r}
-# Clearly division in two cluster results in best fit
-ggplot(hpi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
-
-```
+# What characterises those clusters?
 
 ```{r}
-# Let's add some more data
-# SPI data
-spi <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
-                 sheet = "2016",
-                 range = "A1:BQ237",
-                 trim_ws = TRUE)
-spi[3:76] <- lapply(spi[3:69], as.numeric)
-spi[1:2] <- lapply(spi[1:2], as.factor)
+# Statistics per bi_cluster to compare
+fct_order <- c("Basic Human Needs SCALED",    
+               "Foundations of Wellbeing SCALED",
+               "Opportunity SCALED",
+               "Social Progress Index SCALED",
+               "Happy Life Years SCALED",
+               "Footprint\r\n(gha/capita) SCALED",
+               "Happy Planet Index SCALED")
 
-# scale
-spi[3:76] <- scale(spi[3:76])
+bi_averages <- scaled_clustered %>% select(`Happy Life Years SCALED`,
+                                           `Footprint\r\n(gha/capita) SCALED`,
+                                           `Happy Planet Index SCALED`,
+                                           `Basic Human Needs SCALED`,
+                                           `Foundations of Wellbeing SCALED`,
+                                           `Opportunity SCALED`,
+                                           `Social Progress Index SCALED`,
+                                           bi_cluster) %>%
+                                    group_by(bi_cluster) %>%
+                                    summarise_all(mean) %>%
+                                    gather(-bi_cluster, key = "indicator", value = "score") %>%
+                                    mutate(indicator = as.factor(indicator))
+bi_averages$indicator <- fct_rev(fct_relevel(bi_averages$indicator, fct_order))
 
-# merge scaled data
-data <- hpi[, c(2, 15:23)] %>% inner_join(spi, by = "Country")
-complete_data <- data[complete.cases(data),]
-
-```
-
-```{r}
-
-# How many clusters is optimal?
-
-# Elbow avoid unscaled c("Country", "happy_life_years", "footprint", "Code")
-tot_withinss <- map_dbl(1:10,  function(k){
-  model <- kmeans(x = complete_data[, -c(1, 8:11)], centers = k)
-  model$tot.withinss
-})
-
-elbow_df <- data.frame(
-  k = 1:10,
-  tot_withinss = tot_withinss
-)
-
-print(elbow_df)
-
-ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
-  geom_line() +
-  scale_x_continuous(breaks = 1:10)
-
-# Silhouette width
-sil_width <- map_dbl(2:10,  function(k){
-  model <- pam(x = complete_data[, -c(1, 8:11)], k = k)
-  model$silinfo$avg.width
-})
-
-sil_df <- data.frame(
-  k = 2:10,
-  sil_width = sil_width
-)
-
-print(sil_df)
-
-ggplot(sil_df, aes(x = k, y = sil_width)) +
-  geom_line() +
-  scale_x_continuous(breaks = 2:10)
-
-# Two clusters seems best again
-combi_clusters <- kmeans(complete_data[, -c(1, 8:11)], centers = 2, nstart = 20)
-
-combi_clustered <- complete_data %>% mutate(bi_cluster = as.factor(combi_clusters$cluster))
-
-ggplot(combi_clustered, aes(x = happy_life_years, y = footprint, size = happy_planet_index, color = bi_cluster)) + geom_point()
-```
-
-# What characterises those two clusters?
-
-```{r}
-# Statistics per cluster to compare
-
-cluster_averages <- combi_clustered %>% select(happy_life_years_scaled,
-                                               footprint_scaled,
-                                               hpi_scaled,
-                                               `Social Progress Index`,
-                                               `Basic Human Needs`,
-                                               `Foundations of Wellbeing`,
-                                               Opportunity,
-                                               bi_cluster) %>%
-                                        group_by(bi_cluster) %>%
-                                        summarise_all(mean) %>%
-                                        gather(-bi_cluster, key = "indicator", value = "score")
-
-# How to visualise this?
-ggplot(cluster_averages, aes(x= indicator, y = score, label = score)) + 
+# Visualising bi averages scaled
+ggplot(bi_averages, aes(x= indicator, y = score, label = score)) + 
   geom_bar(stat = "identity", aes(fill = bi_cluster), width = 0.5)  +
   scale_fill_manual(name = "Cluster",
                     labels = c("One cluster", "Other cluster"),
@@ -237,5 +213,37 @@ ggplot(cluster_averages, aes(x= indicator, y = score, label = score)) +
   labs(subtitle = "Subtitle will go here",
        title = "This is the title") +
   coord_flip()
+
+# Statistics per tri_cluster to compare
+
+tri_averages <- scaled_clustered %>% select(`Happy Life Years SCALED`,
+                                            `Footprint\r\n(gha/capita) SCALED`,
+                                            `Happy Planet Index SCALED`,
+                                            `Basic Human Needs SCALED`,
+                                            `Foundations of Wellbeing SCALED`,
+                                            `Opportunity SCALED`,
+                                            `Social Progress Index SCALED`,
+                                            tri_cluster) %>%
+                                     group_by(tri_cluster) %>%
+                                     summarise_all(mean) %>%
+                                     gather(-tri_cluster, key = "indicator", value = "score") %>%
+                                    mutate(indicator = as.factor(indicator))
+tri_averages$indicator <- fct_rev(fct_relevel(tri_averages$indicator, fct_order))
+
+# Visualising tri averages scaled
+ggplot(tri_averages, aes(x = indicator, y = score, fill = tri_cluster)) + 
+  geom_bar(position = "dodge", stat = "identity")  +
+  scale_fill_manual(name = "Cluster",
+                    labels = c("One cluster", "Other cluster", "Last cluster"),
+                    values = c("1" = "#00ba38", "2" = "#f8766d", "3" = "#f8ba38")) +
+  labs(subtitle = "Subtitle will go here",
+       title = "This is the title") +
+  coord_flip()
+
+# Which countries are in this cluster?
+cluster_a <- scaled_clustered %>% filter(cluster == 1) %>% select(Country)
+cluster_b <- scaled_clustered %>% filter(cluster == 2) %>% select(Country)
+cluster_c <- scaled_clustered %>% filter(cluster == 3) %>% select(Country)
+cluster_countries <- data.frame(a = cluster_a, b = cluster_b, c = cluster_c)
 ```
 
