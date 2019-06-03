@@ -10,11 +10,9 @@ urlcolor: blue
 ---
 
 ```{r setup, message = FALSE, warning = FALSE}
-# PLEASE NOTE
-# THIS SCRIPT HAS ONLY BEEN TESTED ON A 6-CORE (12-THREAD), 64GB MEMORY MACHINE
-# AND WILL PROBABLY NOT RUN WITH LOWER COMPUTER SPECIFICATIONS.
-parallel::detectCores()
-memory.limit()
+# PLEASE DOWNLOAD THE DATA FILES IN YOUR WORKING DIRECTORY
+# https://www.dropbox.com/s/cqtynj47altwo3d/hpi-data-2016.xlsx?dl=0
+# 
 
 # Script settings
 knitr::opts_chunk$set(
@@ -28,29 +26,49 @@ script_start <- Sys.time()
 
 # Load required packages
 library(tidyverse)
+library(RCurl)
+library(foreign)
 library(gridExtra)
 library(readxl)
 library(tidyimpute)
 library(cluster)
+
 ```
 
 # Loading data
 
 ```{r Loading Raw Data}
 # Happy Planet Index data from http://happyplanetindex.org/s/hpi-data-2016.xlsx retrieved on 2019-06-01
+# Backup on my Dropbox: https://www.dropbox.com/s/cqtynj47altwo3d/hpi-data-2016.xlsx?dl=0
 
-HPI <- read_excel("Data/hpi-data-2016.xlsx",
-                  sheet = "Complete HPI data",
-                  range = "C6:N146",
-                  trim_ws = TRUE)
+# HPI <- read_excel("Data/hpi-data-2016.xlsx",
+#                   sheet = "Complete HPI data",
+#                   range = "C6:N146",
+#                   trim_ws = TRUE)
+# 
+# write_csv(HPI, "hpi.csv")
+
+url <- "https://raw.githubusercontent.com/codrin-kruijne/HappyPlanetIndex/master/hpi.csv"
+hpi_data <- getURL(url)                
+HPI <- read.csv(textConnection(hpi_data))
+
 HPI[1:2] <- lapply(HPI[1:2], as.factor)
-HPI <- HPI %>% mutate(Footprint = 1.73 - `Footprint\r\n(gha/capita)`) # Calculate net footprint by subtracting it from global biocapacity.
+HPI <- HPI %>% mutate(Footprint = 1.73 - `Footprint..gha.capita.`) # Calculate net footprint by subtracting it from global biocapacity.
 
 # Social Progress Initiative data from https://www.socialprogress.org/download retrieved in 2019-06-01
-SPI <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
-                  sheet = "2016",
-                  range = "A1:BQ147", # data for countries that are in the index
-                  trim_ws = TRUE)
+# Backup on my Dropbox: https://www.dropbox.com/s/hb2e3h5l69n0vrx/Social%20Progress%20Index%202018-Results.xlsx?dl=0
+
+# SPI <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
+#                   sheet = "2016",
+#                   range = "A1:BQ147", # data for countries that are in the index
+#                   trim_ws = TRUE)
+# 
+# write_csv(SPI, "spi.csv")
+
+spi_url <- "https://raw.githubusercontent.com/codrin-kruijne/HappyPlanetIndex/master/spi.csv"
+spi_data <- getURL(spi_url)                
+SPI <- read.csv(textConnection(spi_data))
+
 SPI[3:76] <- lapply(SPI[3:69], as.numeric)
 SPI[1:2] <- lapply(SPI[1:2], as.factor)
 SPI <- SPI %>% select(-Code)
@@ -81,18 +99,18 @@ scaled <- imputed %>% mutate_if(is.numeric, scale) %>%
 ```{r Data Exploration}
 
 # Let's have a quick look at the HPI data
-hpi_hist_3 <- ggplot(raw, aes(`Happy Planet Index`)) + geom_histogram(binwidth = 3)
-saveRDS(hpi_hist_3, "graphs/hpi_hist_3.rds")
-hpi_hist_1 <- ggplot(raw, aes(`Happy Planet Index`)) + geom_histogram(binwidth = 1)
-saveRDS(hpi_hist_1, "graphs/hpi_hist_1.rds")
+hpi_hist_3 <- ggplot(raw, aes(`Happy.Planet.Index`)) + geom_histogram(binwidth = 3)
+saveRDS(hpi_hist_3, "hpi_hist_3.rds")
+hpi_hist_1 <- ggplot(raw, aes(`Happy.Planet.Index`)) + geom_histogram(binwidth = 1)
+saveRDS(hpi_hist_1, "hpi_hist_1.rds")
 
-hpi_region_hist <- ggplot(raw, aes(`Happy Planet Index`)) + facet_wrap(~Region) + 
+hpi_region_hist <- ggplot(raw, aes(`Happy.Planet.Index`)) + facet_wrap(~Region) + 
                                          geom_histogram(binwidth = 3)
-saveRDS(hpi_region_hist, "graphs/hpi_region_hist.rds")
+saveRDS(hpi_region_hist, "hpi_region_hist.rds")
 
-hpi_scatter <- ggplot(raw, aes(x = `Happy Life Years`, y = `Footprint`, size = `Happy Planet Index`, color = `Region`)) +
+hpi_scatter <- ggplot(raw, aes(x = `Happy.Life.Years`, y = `Footprint`, size = `Happy.Planet.Index`, color = `Region`)) +
   geom_point()
-saveRDS(hpi_scatter, "graphs/hpi_scatter.rds")
+saveRDS(hpi_scatter, "hpi_scatter.rds")
 
 plot(hpi_hist_3)
 plot(hpi_hist_1)
@@ -109,8 +127,8 @@ data_clusters <- kmeans(scaled[, -c(1, 2)], 6, nstart = 20)
 raw_clustered <- mutate(raw, cluster = as.factor(data_clusters$cluster))
 scaled_clustered <- mutate(scaled, cluster = as.factor(data_clusters$cluster))
 
-cluster_expl <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = `Footprint`, size = `Happy Planet Index`, color = cluster)) + geom_point()
-saveRDS(cluster_expl, "graphs/cluster_expl.rds")
+cluster_expl <- ggplot(raw_clustered, aes(x = `Happy.Life.Years`, y = `Footprint`, size = `Happy.Planet.Index`, color = cluster)) + geom_point()
+saveRDS(cluster_expl, "cluster_expl.rds")
 
 plot(cluster_expl)
 ```
@@ -134,9 +152,9 @@ print(elbow_df)
 elbow_plot <- ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
                 geom_line() +
                 scale_x_continuous(breaks = 1:10)
-saveRDS(elbow_plot, "graphs/elbow_plot.rds")
+saveRDS(elbow_plot, "elbow_plot.rds")
 
-# Silhouette width method https://campus.datacamp.com/courses/cluster-analysis-in-r/k-means-clustering?ex=8
+# Silhouette width method
 
 sil_width <- map_dbl(2:10,  function(k){
   model <- pam(x = scaled[, -c(1, 2)], k = k)
@@ -153,7 +171,7 @@ print(sil_df)
 sil_width_plot <- ggplot(sil_df, aes(x = k, y = sil_width)) +
                     geom_line() +
                     scale_x_continuous(breaks = 2:10)
-saveRDS(sil_width_plot, "graphs/sil_width_plot.rds")
+saveRDS(sil_width_plot, "sil_width_plot.rds")
 
 # Plot
 grid.arrange(elbow_plot, sil_width_plot)
@@ -170,11 +188,11 @@ bi_clusters <- kmeans(scaled[, -c(1, 2)], centers = 2, nstart = 20)
 
 raw_clustered <- raw_clustered %>% mutate(final_cluster = as.factor(bi_clusters$cluster))
 
-bi_plot_hpi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = `Footprint`, size = `Happy Planet Index`, color = final_cluster)) + geom_point()
-saveRDS(bi_plot_hpi, "graphs/bi_plot_hpi.rds")
+bi_plot_hpi <- ggplot(raw_clustered, aes(x = `Happy.Life.Years`, y = `Footprint`, size = `Happy.Planet.Index`, color = final_cluster)) + geom_point()
+saveRDS(bi_plot_hpi, "bi_plot_hpi.rds")
 
-bi_plot_spi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = `Footprint`, size = `Social Progress Index`, color = final_cluster)) + geom_point()
-saveRDS(bi_plot_spi, "graphs/bi_plot_spi.rds")
+bi_plot_spi <- ggplot(raw_clustered, aes(x = `Happy.Life.Years`, y = `Footprint`, size = `Social.Progress.Index`, color = final_cluster)) + geom_point()
+saveRDS(bi_plot_spi, "bi_plot_spi.rds")
 
 # Arrange plots
 plot(bi_plot_hpi)
@@ -188,21 +206,21 @@ plot(bi_plot_spi)
 data <- raw_clustered %>% inner_join(scaled_clustered, by = c("Country", "Region"))
 
 # Statistics per bi_cluster to compare
-fct_order <- c("Basic Human Needs SCALED",    
-               "Foundations of Wellbeing SCALED",
+fct_order <- c("Basic.Human.Needs SCALED",    
+               "Foundations.of.Wellbeing SCALED",
                "Opportunity SCALED",
-               "Social Progress Index SCALED",
-               "Happy Life Years SCALED",
+               "Social.Progress.Index SCALED",
+               "Happy.Life.Years SCALED",
                "Footprint SCALED",
-               "Happy Planet Index SCALED")
+               "Happy.Planet.Index SCALED")
 
-bi_averages <- data %>% select(`Happy Life Years SCALED`,
+bi_averages <- data %>% select(`Happy.Life.Years SCALED`,
                                `Footprint SCALED`,
-                               `Happy Planet Index SCALED`,
-                               `Basic Human Needs SCALED`,
-                               `Foundations of Wellbeing SCALED`,
+                               `Happy.Planet.Index SCALED`,
+                               `Basic.Human.Needs SCALED`,
+                               `Foundations.of.Wellbeing SCALED`,
                                `Opportunity SCALED`,
-                               `Social Progress Index SCALED`,
+                               `Social.Progress.Index SCALED`,
                                 final_cluster) %>%
                         group_by(final_cluster) %>%
                         summarise_all(mean) %>%
@@ -217,7 +235,7 @@ diff_bar <- ggplot(bi_averages, aes(x= indicator, y = value, label = value)) +
               labs(title = "How do countries in clusters differ?",
                    subtitle = "Indicator avereges for countries per cluster") +
               coord_flip()
-saveRDS(diff_bar, "graphs/diff_bar.rds")
+saveRDS(diff_bar, "diff_bar.rds")
 plot(diff_bar)
 ```
 # Appendix
@@ -227,11 +245,12 @@ plot(diff_bar)
 cluster_1 <- data %>% filter(final_cluster == 1) %>% select(Country)
 cluster_2 <- data %>% filter(final_cluster == 2) %>% select(Country)
 
-k1 = cluster_1[1:(nrow(cluster_1)/2),] %>% rename("Cluster 1" = "Country")
-k2 = cluster_1[(nrow(cluster_1)/2+1):nrow(cluster_1),] %>% rename("countries" = "Country")
-k3 = cluster_2[1:(nrow(cluster_2)/2),] %>% rename("Cluster 2" = "Country")
-k4 = cluster_2[(nrow(cluster_2)/2+1):nrow(cluster_2),]%>% rename("countries" = "Country")
-country_list <- list(k1, k2, k3, k4)
+k1 = cluster_1[1:(nrow(cluster_1)/2),]
+k2 = cluster_1[(nrow(cluster_1)/2+1):nrow(cluster_1),]
+k3 = cluster_2[1:(nrow(cluster_2)/2),]
+k4 = cluster_2[(nrow(cluster_2)/2+1):nrow(cluster_2),]
+country_list <- list(k1 = "Cluster 1", k2 = "countries", k3 = "Cluster 2", k4 = "countries")
+
 saveRDS(country_list, "country_list.rds")
 knitr::kable(country_list)
 

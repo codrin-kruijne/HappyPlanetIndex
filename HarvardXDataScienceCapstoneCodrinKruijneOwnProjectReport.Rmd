@@ -45,10 +45,10 @@ Data from HPI and SPI were joined by Country name. Missing values imputed by mea
 To get an initial view of the data we plot histograms of HPI scores with different bin withs and a scatter plot with major variables.
 
 ```{r}
-hpi_hist_3 <- readRDS("graphs/hpi_hist_3.rds")
-hpi_hist_1 <- readRDS("graphs/hpi_hist_1.rds")
-hpi_region_hist <- readRDS("graphs/hpi_region_hist.rds")
-hpi_scatter <- readRDS("graphs/hpi_scatter.rds")
+hpi_hist_3 <- readRDS("hpi_hist_3.rds")
+hpi_hist_1 <- readRDS("hpi_hist_1.rds")
+hpi_region_hist <- readRDS("hpi_region_hist.rds")
+hpi_scatter <- readRDS("hpi_scatter.rds")
 
 grid.arrange(hpi_hist_3, hpi_hist_1)
 
@@ -65,15 +65,15 @@ The scatterplot shows HPI on the x-axis and the effective footprint on the y-axi
 As the data provides six regions, we use that for the amount of initial clusters, after which we will calculate the most appropriate amount of clusters. We used K-means clustering.
 
 ```{r}
-cluster_expl <- readRDS("graphs/cluster_expl.rds")
+cluster_expl <- readRDS("cluster_expl.rds")
 plot(cluster_expl)
 ```
 
 These clusters differ quite a bit from the geographical regions. Lets calculate the optimal amount of clusters using the Elbow method and Silhouette width.
 
 ```{r}
-elbow_plot <- readRDS("graphs/elbow_plot.rds")
-sil_width_plot <- readRDS("graphs/sil_width_plot.rds")
+elbow_plot <- readRDS("elbow_plot.rds")
+sil_width_plot <- readRDS("sil_width_plot.rds")
 
 grid.arrange(elbow_plot, sil_width_plot)
 ```
@@ -87,10 +87,10 @@ Fitting several cluster models shows two clusters seems to be the best separatio
 The figures below show the data with clusters identified by color and size representing first HPI and then SPI.
 
 ```{r}
-bi_plot_hpi <- readRDS("graphs/bi_plot_hpi.rds")
+bi_plot_hpi <- readRDS("bi_plot_hpi.rds")
 plot(bi_plot_hpi)
 
-bi_plot_spi <- readRDS("graphs/bi_plot_spi.rds")
+bi_plot_spi <- readRDS("bi_plot_spi.rds")
 plot(bi_plot_spi)
 ```
 
@@ -101,7 +101,7 @@ The first cluster seems to have most coutries with a positive footprint, meaning
 To better understand the differences in countries we plot the average scores per cluster on the major components of both the HPI and SPI indicators.
 
 ```{r warning=FALSE}
-diff_bar <- readRDS("graphs/diff_bar.rds")
+diff_bar <- readRDS("diff_bar.rds")
 plot(diff_bar)
 ```
 
