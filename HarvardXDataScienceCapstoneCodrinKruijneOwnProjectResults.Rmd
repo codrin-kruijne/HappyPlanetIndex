@@ -108,7 +108,7 @@ hpi_region_hist <- ggplot(raw, aes(`Happy.Planet.Index`)) + facet_wrap(~Region) 
                                          geom_histogram(binwidth = 3)
 saveRDS(hpi_region_hist, "hpi_region_hist.rds")
 
-hpi_scatter <- ggplot(raw, aes(x = `Happy.Life.Years`, y = `Footprint`, size = `Happy.Planet.Index`, color = `Region`)) +
+hpi_scatter <- ggplot(raw, aes(x = `Happy.Life.Years`, y = Footprint, size = `Happy.Planet.Index`, color = `Region`)) +
   geom_point()
 saveRDS(hpi_scatter, "hpi_scatter.rds")
 
@@ -249,7 +249,7 @@ k1 = cluster_1[1:(nrow(cluster_1)/2),]
 k2 = cluster_1[(nrow(cluster_1)/2+1):nrow(cluster_1),]
 k3 = cluster_2[1:(nrow(cluster_2)/2),]
 k4 = cluster_2[(nrow(cluster_2)/2+1):nrow(cluster_2),]
-country_list <- list(k1 = "Cluster 1", k2 = "countries", k3 = "Cluster 2", k4 = "countries")
+country_list <- list(k1, k2, k3, k4)
 
 saveRDS(country_list, "country_list.rds")
 knitr::kable(country_list)
