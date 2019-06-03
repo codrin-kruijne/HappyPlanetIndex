@@ -44,6 +44,8 @@ HPI <- read_excel("Data/hpi-data-2016.xlsx",
                   range = "C6:N146",
                   trim_ws = TRUE)
 HPI[1:2] <- lapply(HPI[1:2], as.factor)
+HPI <- HPI %>% mutate(Footprint = 1.73 - `Footprint
+(gha/capita)`) # Calculate net footprint by subtracting it from global biocapacity.
 
 # Social Progress Initiative data from https://www.socialprogress.org/download retrieved in 2019-06-01
 SPI <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
@@ -80,12 +82,27 @@ scaled <- imputed %>% mutate_if(is.numeric, scale) %>%
 ```{r Data Exploration}
 
 # Let's have a quick look at the HPI data
-hist(raw$`Happy Planet Index`, breaks = 30)
+hpi_hist_3 <- ggplot(raw, aes(`Happy Planet Index`)) + geom_histogram(binwidth = 3)
+saveRDS(hpi_hist_3, "graphs/hpi_hist_3.rds")
+hpi_hist_1 <- ggplot(raw, aes(`Happy Planet Index`)) + geom_histogram(binwidth = 1)
+saveRDS(hpi_hist_1, "graphs/hpi_hist_1.rds")
 
-ggplot(raw, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = `Region`)) + geom_point()
+hpi_region_hist <- ggplot(raw, aes(`Happy Planet Index`)) + facet_wrap(~Region) + 
+                                         geom_histogram(binwidth = 3)
+saveRDS(hpi_region_hist, "graphs/hpi_region_hist.rds")
+
+hpi_scatter <- ggplot(raw, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = `Region`)) +
+  geom_point()
+saveRDS(hpi_scatter, "graphs/hpi_scatter.rds")
+
+plot(hpi_hist_3)
+plot(hpi_hist_1)
+plot(hpi_region_hist)
+plot(hpi_scatter)
+
 ```
 
-# Clustering data
+# Cluster modeling
 
 ```{r}
 data_clusters <- kmeans(scaled[, -c(1, 2)], 6, nstart = 20)
@@ -93,10 +110,12 @@ data_clusters <- kmeans(scaled[, -c(1, 2)], 6, nstart = 20)
 raw_clustered <- mutate(raw, cluster = as.factor(data_clusters$cluster))
 scaled_clustered <- mutate(scaled, cluster = as.factor(data_clusters$cluster))
 
-ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = cluster)) + geom_point()
+cluster_expl <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = cluster)) + geom_point()
+saveRDS(cluster_expl, "graphs/cluster_expl.rds")
+
+plot(cluster_expl)
 ```
 
-# Finding optimal amount of clusters
 ```{r}
 
 # Using the elbow method
@@ -116,24 +135,10 @@ print(elbow_df)
 elbow_plot <- ggplot(elbow_df, aes(x = k, y = tot_withinss)) +
                 geom_line() +
                 scale_x_continuous(breaks = 1:10)
+saveRDS(elbow_plot, "graphs/elbow_plot.rds")
 
-# Silhouette method https://campus.datacamp.com/courses/cluster-analysis-in-r/k-means-clustering?ex=8
-pam_k2 <- pam(scaled[, -c(1, 2)], k = 2)
-pam_k3 <- pam(scaled[, -c(1, 2)], k = 3)
+# Silhouette width method https://campus.datacamp.com/courses/cluster-analysis-in-r/k-means-clustering?ex=8
 
-#pam_k3$silinfo$widths
-
-library(gridGraphics)
-grab_grob <- function(){
-  grid.echo()
-  grid.grab()
-}
-plot(silhouette(pam_k2))
-pam_k2_plot <- grab_grob()
-plot(silhouette(pam_k3))
-pam_k3_plot <- grab_grob()
-
-# Silhouette width plot
 sil_width <- map_dbl(2:10,  function(k){
   model <- pam(x = scaled[, -c(1, 2)], k = k)
   model$silinfo$avg.width
@@ -149,38 +154,40 @@ print(sil_df)
 sil_width_plot <- ggplot(sil_df, aes(x = k, y = sil_width)) +
                     geom_line() +
                     scale_x_continuous(breaks = 2:10)
+saveRDS(sil_width_plot, "graphs/sil_width_plot.rds")
 
-
-# Arrange plots
-grid.arrange(elbow_plot, sil_width_plot, 
-             pam_k2_plot, pam_k3_plot,
-             ncol = 2, nrow = 2)
+# Plot
+grid.arrange(elbow_plot, sil_width_plot)
 
 ```
 
+# Visualising clustered data
+
 ```{r}
+
 # It seems 2 or 3 clusters is optimal, let's have a look
 
 bi_clusters <- kmeans(scaled[, -c(1, 2)], centers = 2, nstart = 20)
-tri_clusters <- kmeans(scaled[, -c(1, 2)], centers = 3, nstart = 20)
-quad_clusters <- kmeans(scaled[, -c(1, 2)], centers = 4, nstart = 20)
 
-raw_clustered <- raw_clustered %>% mutate(bi_cluster = as.factor(bi_clusters$cluster),
-                                          tri_cluster = as.factor(tri_clusters$cluster),
-                                          quad_cluster = as.factor(quad_clusters$cluster))
+raw_clustered <- raw_clustered %>% mutate(final_cluster = as.factor(bi_clusters$cluster))
 
-bi_plot <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = bi_cluster)) + geom_point()
-tri_plot <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = tri_cluster)) + geom_point()
-quad_plot <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = quad_cluster)) + geom_point()
+bi_plot_hpi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = final_cluster)) + geom_point()
+saveRDS(bi_plot_hpi, "graphs/bi_plot_hpi.rds")
+
+bi_plot_spi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Social Progress Index`, color = final_cluster)) + geom_point()
+saveRDS(bi_plot_spi, "graphs/bi_plot_spi.rds")
 
 # Arrange plots
-grid.arrange(bi_plot, tri_plot, quad_plot,
-             ncol = 1, nrow = 3)
+plot(bi_plot_hpi)
+plot(bi_plot_spi)
 ```
 
-# What characterises those clusters?
+# Cluster analysis
 
 ```{r}
+# Lets combina all data for analysis and visualisation
+data <- raw_clustered %>% inner_join(scaled_clustered, by = c("Country", "Region"))
+
 # Statistics per bi_cluster to compare
 fct_order <- c("Basic Human Needs SCALED",    
                "Foundations of Wellbeing SCALED",
@@ -190,60 +197,50 @@ fct_order <- c("Basic Human Needs SCALED",
                "Footprint\r\n(gha/capita) SCALED",
                "Happy Planet Index SCALED")
 
-bi_averages <- scaled_clustered %>% select(`Happy Life Years SCALED`,
-                                           `Footprint\r\n(gha/capita) SCALED`,
-                                           `Happy Planet Index SCALED`,
-                                           `Basic Human Needs SCALED`,
-                                           `Foundations of Wellbeing SCALED`,
-                                           `Opportunity SCALED`,
-                                           `Social Progress Index SCALED`,
-                                           bi_cluster) %>%
-                                    group_by(bi_cluster) %>%
-                                    summarise_all(mean) %>%
-                                    gather(-bi_cluster, key = "indicator", value = "score") %>%
-                                    mutate(indicator = as.factor(indicator))
+bi_averages <- data %>% select(`Happy Life Years SCALED`,
+                               `Footprint\r\n(gha/capita) SCALED`,
+                               `Happy Planet Index SCALED`,
+                               `Basic Human Needs SCALED`,
+                               `Foundations of Wellbeing SCALED`,
+                               `Opportunity SCALED`,
+                               `Social Progress Index SCALED`,
+                                final_cluster) %>%
+                        group_by(final_cluster) %>%
+                        summarise_all(mean) %>%
+                        gather(-final_cluster, key = "indicator", value = "value") %>%
+                        mutate(indicator = as.factor(indicator))
+
 bi_averages$indicator <- fct_rev(fct_relevel(bi_averages$indicator, fct_order))
 
 # Visualising bi averages scaled
-ggplot(bi_averages, aes(x= indicator, y = score, label = score)) + 
-  geom_bar(stat = "identity", aes(fill = bi_cluster), width = 0.5)  +
-  scale_fill_manual(name = "Cluster",
-                    labels = c("One cluster", "Other cluster"),
-                    values = c("1" = "#00ba38", "2" = "#f8766d")) +
-  labs(subtitle = "Subtitle will go here",
-       title = "This is the title") +
-  coord_flip()
+diff_bar <- ggplot(bi_averages, aes(x= indicator, y = value, label = value)) + 
+              geom_bar(stat = "identity", aes(fill = final_cluster), width = 0.5)  +
+              labs(title = "How do countries in clusters differ?",
+                   subtitle = "Indicator avereges for countries per cluster") +
+              coord_flip()
+saveRDS(diff_bar, "graphs/diff_bar.rds")
+plot(diff_bar)
+```
+# Appendix
 
-# Statistics per tri_cluster to compare
+```{r}
+# Which countries are in these cluster?
+cluster_1 <- data %>% filter(final_cluster == 1) %>% select(Country)
+cluster_2 <- data %>% filter(final_cluster == 2) %>% select(Country)
 
-tri_averages <- scaled_clustered %>% select(`Happy Life Years SCALED`,
-                                            `Footprint\r\n(gha/capita) SCALED`,
-                                            `Happy Planet Index SCALED`,
-                                            `Basic Human Needs SCALED`,
-                                            `Foundations of Wellbeing SCALED`,
-                                            `Opportunity SCALED`,
-                                            `Social Progress Index SCALED`,
-                                            tri_cluster) %>%
-                                     group_by(tri_cluster) %>%
-                                     summarise_all(mean) %>%
-                                     gather(-tri_cluster, key = "indicator", value = "score") %>%
-                                    mutate(indicator = as.factor(indicator))
-tri_averages$indicator <- fct_rev(fct_relevel(tri_averages$indicator, fct_order))
+k1 = cluster_1[1:(nrow(cluster_1)/2),] %>% rename("Cluster 1" = "Country")
+k2 = cluster_1[(nrow(cluster_1)/2+1):nrow(cluster_1),] %>% rename("countries" = "Country")
+k3 = cluster_2[1:(nrow(cluster_2)/2),] %>% rename("Cluster 2" = "Country")
+k4 = cluster_2[(nrow(cluster_2)/2+1):nrow(cluster_2),]%>% rename("countries" = "Country")
+country_list <- list(k1, k2, k3, k4)
+saveRDS(country_list, "country_list.rds")
+knitr::kable(country_list)
 
-# Visualising tri averages scaled
-ggplot(tri_averages, aes(x = indicator, y = score, fill = tri_cluster)) + 
-  geom_bar(position = "dodge", stat = "identity")  +
-  scale_fill_manual(name = "Cluster",
-                    labels = c("One cluster", "Other cluster", "Last cluster"),
-                    values = c("1" = "#00ba38", "2" = "#f8766d", "3" = "#f8ba38")) +
-  labs(subtitle = "Subtitle will go here",
-       title = "This is the title") +
-  coord_flip()
-
-# Which countries are in this cluster?
-cluster_a <- scaled_clustered %>% filter(cluster == 1) %>% select(Country)
-cluster_b <- scaled_clustered %>% filter(cluster == 2) %>% select(Country)
-cluster_c <- scaled_clustered %>% filter(cluster == 3) %>% select(Country)
-cluster_countries <- data.frame(a = cluster_a, b = cluster_b, c = cluster_c)
 ```
 
+```{r}
+# How long did the whole script take?
+script_end <- Sys.time()
+
+print(paste("Total script running time: ", round(difftime(script_end, script_start, units = "mins"), 1), " minutes"))
+```
