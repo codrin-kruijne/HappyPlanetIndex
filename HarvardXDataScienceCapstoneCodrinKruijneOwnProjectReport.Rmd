@@ -8,17 +8,27 @@ output:
 urlcolor: blue
 ---
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 require(dplyr)
 require(gridExtra)
+
+# Script settings
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	echo = FALSE,
+	cache = TRUE,
+	tidy.opts = list(width.cutoff = 100),
+	tidy = TRUE
+)
 ```
 
 This report has been prepared for the [HarvardX Data Science program](https://www.edx.org/professional-certificate/harvardx-data-science) Capstone course final project submission and consists of three files of original work that can be found [on GitHub](https://github.com/codrin-kruijne/HappyPlanetIndex) (with all commits): this [report in PDF](), this [report in R markdown]() and an [R markdown script file]() with all the code (also [knitted to PDF with results]() for convenience). Results are read in from data objects stored locally (also saved in the GitHub repository), that were the output of the script file. We were limited in our visualisations by the requirement to publish to PDF.
 
 
-# Introduction
+# Summary
 
-Humankind uses diverse progress indicators, most currently Growth Domestic Product (GDP) to guage economic growth. It is becoming more apparant that this is a limited and myopic view and alternative measures have been emerging over te last years, like the United Nation's Human Development Index. I wanted to have a closer look at two concepts that follow; the Social Progress Index (SPI) and the Happy Planet index (HPI), which take into account the state of our ecosystems. This report describes merging the last avaialbele data for both from the year 2016, applying clustering to see how certain countries group, and having a look at their differences.
+Humankind uses diverse progress indicators, most currently Growth Domestic Product (GDP) to guage economic growth. It is becoming more apparant that this is a limited and myopic view and alternative measures have been emerging over te last years, like the United Nation's Human Development Index. I wanted to have a closer look at two concepts that follow; the Social Progress Index (SPI) and the Happy Planet index (HPI), which take into account the state of our ecosystems. This report describes merging the last avaialbele data for both from the year 2016, applying clustering to see how certain countries group, and having a look at their differences. Resulting clusters show that social progress seems to come at the cost of ecological systems that cannot sustain levels of consumption.
 
 # Analysis
 
@@ -48,7 +58,7 @@ plot(hpi_scatter)
 
 Looking at all HPI scores the histogram seems to show a somewhat normal distribution. The HPI data is already labeled with regions and separating them clearly shows differences, most notably contrasts like the low scores in Sub Saharan Africa and the distributed, yet high scores of the Americas.
 
-The scatterplot shows HPI on the x axis and the effective footprint on the y axis. Footprint data represents how big an area of ecosystems is needed to realise the consumption levels in that country (corrected for many things). 1.73 is the theoretical amount our wolrd would be able to sustain. I chose to show the difference on the y axis; a positive value means countries consume within planetary coundaries; a negative value shows comsumption rate requires more ecosystem capacity than is available. Here you see differences and the underlying values with notabley Sub Saharan africa and Europe at opposite ends. As we have more data from the SPI I wanted to explore what clustering based on all variables beyond region would yield for insights.
+The scatterplot shows HPI on the x-axis and the effective footprint on the y-axis. Footprint data represents how big an area of ecosystems is needed to realise the consumption levels in that country (corrected for many things). 1.73 is the theoretical amount our wolrd would be able to sustain. I chose to show the difference on the y-axis; a positive value means countries consume within planetary boundaries; a negative value shows a comsumption rate requires more ecosystem capacity than is available. Here you see differences and the underlying values with notabley Sub Saharan africa and Europe at opposite ends. As we have more data from the SPI I wanted to explore what clustering based on all variables beyond region would yield for insights.
 
 ## Clustering modeling
 
@@ -68,7 +78,7 @@ sil_width_plot <- readRDS("graphs/sil_width_plot.rds")
 grid.arrange(elbow_plot, sil_width_plot)
 ```
 
-Fitting several cluster models shows two clusters seems to be the best seperation. At k = 2 we see the elbow bend and the average silhouette with is highest when data is separated in two.
+Fitting several cluster models shows two clusters seems to be the best separation. At k = 2 we see the elbow bend and the average silhouette with is highest when data is separated in two.
 
 # Results
 
@@ -84,7 +94,7 @@ bi_plot_spi <- readRDS("graphs/bi_plot_spi.rds")
 plot(bi_plot_spi)
 ```
 
-The first cluster seems to have most coutries with a positive footprint, meaning their comsumption can be sustained, while the second cluster has increasingly Happy Life Years and more negative footprint. Using HPI as size for datapoints accentuates that the lower happy life years and the higher negative footprint, the less is HPI score, whereas SPI score visually seems similar.
+The first cluster seems to have most coutries with a positive footprint, meaning their comsumption can be sustained, while the second cluster has increasingly Happy Life Years and more negative footprint. Using HPI as size for datapoints accentuates that the lower happy life years and the higher negative footprint, the less is HPI score, whereas SPI score visually seems similar putting an emphasis on social progress.
 
 ## Cluster analysis
 
@@ -97,12 +107,9 @@ plot(diff_bar)
 
 # Conclusions and discussion
 
-We can see a clear distinction between clusters on average scores of a select number of indicators.
-
-Further analysis into all measures may provide additional insights into 
-
-
-
+We can see a clear distinction between clusters on average scores of a select number of indicators. Countries in cluster 1 score above average except for their environmental footprint; they are doing wel socially, but at the cost of our ecological systems. Countries in cluster 2 score well below averages, except for their footprint.
+Although this graph shows relative performance of clusters, a major concern is the high nimber of countries with negative net footprint; meaning we are comsuming not only the services of out ecosystems, but the production capacity itself, which will lead to increasing footprint pressure.
+Further analysis into all measures may provide additional insights into differences in these clusters. Particularly interesting woud be to explore countries with positive net footprint.
 
 # References
 

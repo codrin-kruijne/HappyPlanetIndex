@@ -44,8 +44,7 @@ HPI <- read_excel("Data/hpi-data-2016.xlsx",
                   range = "C6:N146",
                   trim_ws = TRUE)
 HPI[1:2] <- lapply(HPI[1:2], as.factor)
-HPI <- HPI %>% mutate(Footprint = 1.73 - `Footprint
-(gha/capita)`) # Calculate net footprint by subtracting it from global biocapacity.
+HPI <- HPI %>% mutate(Footprint = 1.73 - `Footprint\r\n(gha/capita)`) # Calculate net footprint by subtracting it from global biocapacity.
 
 # Social Progress Initiative data from https://www.socialprogress.org/download retrieved in 2019-06-01
 SPI <- read_excel("Data/Social Progress Index 2018-Results.xlsx",
@@ -91,7 +90,7 @@ hpi_region_hist <- ggplot(raw, aes(`Happy Planet Index`)) + facet_wrap(~Region) 
                                          geom_histogram(binwidth = 3)
 saveRDS(hpi_region_hist, "graphs/hpi_region_hist.rds")
 
-hpi_scatter <- ggplot(raw, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = `Region`)) +
+hpi_scatter <- ggplot(raw, aes(x = `Happy Life Years`, y = `Footprint`, size = `Happy Planet Index`, color = `Region`)) +
   geom_point()
 saveRDS(hpi_scatter, "graphs/hpi_scatter.rds")
 
@@ -110,7 +109,7 @@ data_clusters <- kmeans(scaled[, -c(1, 2)], 6, nstart = 20)
 raw_clustered <- mutate(raw, cluster = as.factor(data_clusters$cluster))
 scaled_clustered <- mutate(scaled, cluster = as.factor(data_clusters$cluster))
 
-cluster_expl <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = cluster)) + geom_point()
+cluster_expl <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = `Footprint`, size = `Happy Planet Index`, color = cluster)) + geom_point()
 saveRDS(cluster_expl, "graphs/cluster_expl.rds")
 
 plot(cluster_expl)
@@ -171,10 +170,10 @@ bi_clusters <- kmeans(scaled[, -c(1, 2)], centers = 2, nstart = 20)
 
 raw_clustered <- raw_clustered %>% mutate(final_cluster = as.factor(bi_clusters$cluster))
 
-bi_plot_hpi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Happy Planet Index`, color = final_cluster)) + geom_point()
+bi_plot_hpi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = `Footprint`, size = `Happy Planet Index`, color = final_cluster)) + geom_point()
 saveRDS(bi_plot_hpi, "graphs/bi_plot_hpi.rds")
 
-bi_plot_spi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = 1.73 - `Footprint\r\n(gha/capita)`, size = `Social Progress Index`, color = final_cluster)) + geom_point()
+bi_plot_spi <- ggplot(raw_clustered, aes(x = `Happy Life Years`, y = `Footprint`, size = `Social Progress Index`, color = final_cluster)) + geom_point()
 saveRDS(bi_plot_spi, "graphs/bi_plot_spi.rds")
 
 # Arrange plots
@@ -194,11 +193,11 @@ fct_order <- c("Basic Human Needs SCALED",
                "Opportunity SCALED",
                "Social Progress Index SCALED",
                "Happy Life Years SCALED",
-               "Footprint\r\n(gha/capita) SCALED",
+               "Footprint SCALED",
                "Happy Planet Index SCALED")
 
 bi_averages <- data %>% select(`Happy Life Years SCALED`,
-                               `Footprint\r\n(gha/capita) SCALED`,
+                               `Footprint SCALED`,
                                `Happy Planet Index SCALED`,
                                `Basic Human Needs SCALED`,
                                `Foundations of Wellbeing SCALED`,
