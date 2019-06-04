@@ -10,9 +10,11 @@ urlcolor: blue
 ---
 
 ```{r setup, message = FALSE, warning = FALSE}
-# PLEASE DOWNLOAD THE DATA FILES IN YOUR WORKING DIRECTORY
-# https://www.dropbox.com/s/cqtynj47altwo3d/hpi-data-2016.xlsx?dl=0
-# 
+# PLEASE NOTE: SCRIPT SHOULD RUN ALL NECESSARY DATA, BUT HAS ONLY BEEN TESTED ON WINDOWS 
+# IF NEEDED, PLEASE DOWNLOAD THE TWO REQUIRED FILES IN a "Data" SUBDIR OF YOUR WORKING DIRECTORY
+# HPI DATA https://www.dropbox.com/s/cqtynj47altwo3d/hpi-data-2016.xlsx?dl=0
+# SPI DATA https://www.dropbox.com/s/hb2e3h5l69n0vrx/Social%20Progress%20Index%202018-Results.xlsx?dl=0
+# YOU CAN UNCOMMENT CODE BELOW TO READ IN THE LOCAL FILES
 
 # Script settings
 knitr::opts_chunk$set(
@@ -245,10 +247,10 @@ plot(diff_bar)
 cluster_1 <- data %>% filter(final_cluster == 1) %>% select(Country)
 cluster_2 <- data %>% filter(final_cluster == 2) %>% select(Country)
 
-k1 = cluster_1[1:(nrow(cluster_1)/2),]
-k2 = cluster_1[(nrow(cluster_1)/2+1):nrow(cluster_1),]
-k3 = cluster_2[1:(nrow(cluster_2)/2),]
-k4 = cluster_2[(nrow(cluster_2)/2+1):nrow(cluster_2),]
+k1 = data.frame("Cluster 1" = cluster_1[1:(nrow(cluster_1)/2),])
+k2 = data.frame("Cluster 1" = cluster_1[(nrow(cluster_1)/2+1):nrow(cluster_1),])
+k3 = data.frame("Cluster 2" = cluster_2[1:(nrow(cluster_2)/2),])
+k4 = data.frame("Cluster 2" = cluster_2[(nrow(cluster_2)/2+1):nrow(cluster_2),])
 country_list <- list(k1, k2, k3, k4)
 
 saveRDS(country_list, "country_list.rds")
